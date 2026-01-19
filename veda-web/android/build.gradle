@@ -1,0 +1,5 @@
+apply from: "variables.gradle"
+
+tasks.register('clean', Delete) {
+    delete rootProject.buildDir
+}

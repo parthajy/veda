@@ -1,0 +1,47 @@
+{
+  "name": "veda-web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:buyer": "cross-env VITE_APP_MODE=buyer vite",
+    "dev:seller": "cross-env VITE_APP_MODE=seller vite",
+    "build": "tsc -b && vite build",
+    "build:buyer": "cross-env VITE_APP_MODE=buyer tsc -b && vite build",
+    "build:seller": "cross-env VITE_APP_MODE=seller tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "android:assets:seller": "npm run build:seller && rm -rf android/app/src/seller/assets/public && mkdir -p android/app/src/seller/assets/public && cp -R dist/* android/app/src/seller/assets/public/",
+    "android:assets:buyer": "npm run build:buyer && rm -rf android/app/src/buyer/assets/public && mkdir -p android/app/src/buyer/assets/public && cp -R dist/* android/app/src/buyer/assets/public/"
+  },
+  "dependencies": {
+    "@capacitor/geolocation": "^8.0.0",
+    "@capacitor/push-notifications": "^8.0.0",
+    "@supabase/supabase-js": "^2.90.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.12.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.0.1",
+    "@capacitor/cli": "^8.0.1",
+    "@capacitor/core": "^8.0.1",
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "autoprefixer": "^10.4.23",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^7.2.4"
+  }
+}

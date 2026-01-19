@@ -1,0 +1,8 @@
+{
+  "appId": "com.useveda.seller",
+  "appName": "Veda Seller",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https"
+  }
+}

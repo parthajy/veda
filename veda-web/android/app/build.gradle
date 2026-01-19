@@ -1,0 +1,88 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace = "com.useveda.veda"
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        aaptOptions {
+            // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+
+    flavorDimensions "mode"
+
+    productFlavors {
+    buyer {
+        dimension "mode"
+        applicationId "com.useveda.buyer"
+        resValue "string", "app_name", "Veda Buyer"
+        manifestPlaceholders = [ CAP_CONFIG_FILE: "capacitor.config.json" ]
+    }
+    seller {
+        dimension "mode"
+        applicationId "com.useveda.seller"
+        resValue "string", "app_name", "Veda Seller"
+        manifestPlaceholders = [ CAP_CONFIG_FILE: "capacitor.config.json" ]
+    }
+}
+
+    // IMPORTANT:
+    // - Capacitor will always put the default web bundle in src/main/assets/public
+    // - You are also placing flavored bundles in src/{seller|buyer}/assets/public
+    // That causes duplicate index.html/assets. So we:
+    // 1) Keep src/main/assets ONLY for capacitor.config.json etc.
+    // 2) Add flavor assets dirs
+    // 3) Exclude src/main/assets/public for buyer/seller builds via packagingOptions
+    sourceSets {
+    main {
+        // ONLY shared capacitor metadata (plugins list etc). NO public/ here.
+        assets.srcDirs = ["src/main/assets"]
+    }
+    buyer {
+        assets.srcDirs = ["src/buyer/assets"]
+    }
+    seller {
+        assets.srcDirs = ["src/seller/assets"]
+    }
+}
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception _) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
