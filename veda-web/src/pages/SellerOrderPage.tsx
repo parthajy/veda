@@ -15,7 +15,7 @@ export default function SellerOrderPage() {
   const { orderId } = useParams();
   const [loc, setLoc] = useState<LocRow | null>(null);
   const [buyerPhone, setBuyerPhone] = useState<string | null>(null);
-  const [buyerUserId, setBuyerUserId] = useState<string | null>(null);
+  const [_buyerUserId, setBuyerUserId] = useState<string | null>(null);
 
   const [pin, setPin] = useState("");
   const [ok, setOk] = useState<boolean | null>(null);
