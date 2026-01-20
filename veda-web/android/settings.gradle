@@ -1,29 +1,5 @@
-pluginManagement {
-  repositories {
-    google()
-    mavenCentral()
-    gradlePluginPortal()
-  }
-
-  plugins {
-    id "com.android.application" version '8.13.0'
-    id "com.android.library" version '8.13.0'
-  }
-}
-
-dependencyResolutionManagement {
-  // IMPORTANT: Capacitor/Cordova modules add repositories (google/flatDir).
-  // If you use FAIL_ON_PROJECT_REPOS or prefer settings too strictly, builds explode.
-  repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
-
-  repositories {
-    google()
-    mavenCentral()
-  }
-}
-
 include ':app'
-include ':capacitor-android'
 include ':capacitor-cordova-android-plugins'
+project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
 
 apply from: 'capacitor.settings.gradle'

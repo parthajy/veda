@@ -1,6 +1,7 @@
 // src/components/thread/ThreadPhotosPanel.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import { Plus } from "lucide-react";
 
 type PhotoRow = {
   id: string;
@@ -172,15 +173,19 @@ export default function ThreadPhotosPanel({
           </div>
 
           <button
-            type="button"
-            onClick={chooseFiles}
-            disabled={busy || remaining <= 0}
-            className={`rounded-full px-3 py-1.5 text-xs border ${
-              busy || remaining <= 0 ? "bg-zinc-100 text-zinc-400 border-zinc-200" : "bg-black text-white border-black"
-            }`}
-          >
-            {busy ? "Working…" : remaining <= 0 ? "Limit reached" : "Add photo"}
-          </button>
+  type="button"
+  onClick={chooseFiles}
+  disabled={busy || remaining <= 0}
+  className={[
+    "inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs transition",
+    busy || remaining <= 0
+      ? "bg-zinc-100 text-zinc-400 border-zinc-200"
+      : "bg-black text-white border-black hover:opacity-95 active:scale-[0.99]",
+  ].join(" ")}
+>
+  <Plus size={14} />
+  {busy ? "Working…" : remaining <= 0 ? "Limit reached" : "Add photo"}
+</button>
 
           <input
             ref={fileRef}

@@ -7,17 +7,18 @@ function isSellerPath() {
   return p === "/seller" || p.startsWith("/seller/");
 }
 
+/**
+ * ✅ Now: only ensures profile IF a real session exists.
+ * ❌ No anonymous sign-in anymore.
+ */
 export async function ensureSessionAndProfile() {
   const { data } = await supabase.auth.getSession();
+  const user = data.session?.user;
 
-  if (!data.session) {
-    const res = await supabase.auth.signInAnonymously();
-    if (res.error) throw res.error;
+  if (!user) {
+    // No session — caller decides what UI to show (AuthWall).
+    return;
   }
-
-  const session2 = await supabase.auth.getSession();
-  const user = session2.data.session?.user;
-  if (!user) throw new Error("No user session");
 
   const { data: existing, error: selErr } = await supabase
     .from("profiles")
@@ -35,8 +36,7 @@ export async function ensureSessionAndProfile() {
     });
     if (insErr) throw insErr;
   } else {
-    // If seller app, enforce seller role (no more toggles)
-    // One-way upgrade only
+    // one-way upgrade to seller if user enters seller area
     if (isSellerPath() && existing.role !== "seller") {
       await supabase.from("profiles").update({ role: "seller" }).eq("id", user.id);
     }

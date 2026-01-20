@@ -14,6 +14,8 @@ type LocRow = {
 export default function SellerOrderPage() {
   const { orderId } = useParams();
   const [loc, setLoc] = useState<LocRow | null>(null);
+  const [buyerPhone, setBuyerPhone] = useState<string | null>(null);
+  const [buyerUserId, setBuyerUserId] = useState<string | null>(null);
 
   const [pin, setPin] = useState("");
   const [ok, setOk] = useState<boolean | null>(null);
@@ -28,6 +30,12 @@ export default function SellerOrderPage() {
     return `https://www.google.com/maps/search/?api=1&query=${q}`;
   }, [loc]);
 
+  const telUrl = useMemo(() => {
+if (!buyerPhone) return null;
+    const p = buyerPhone.replace(/[^\d+]/g, "");
+    return p ? `tel:${p}` : null;
+  }, [buyerPhone]);
+
   useEffect(() => {
     if (!orderId) return;
     (async () => {
@@ -39,7 +47,7 @@ export default function SellerOrderPage() {
       // delivery state + eta (read from orders)
       const { data: o, error: oErr } = await supabase
         .from("orders")
-        .select("delivery_state, eta_minutes")
+        .select("delivery_state, eta_minutes, request_id")
         .eq("id", orderId)
         .maybeSingle();
 
@@ -47,6 +55,28 @@ export default function SellerOrderPage() {
         const s = (o as any).delivery_state as any;
         if (s === "on_the_way" || s === "arrived" || s === "preparing") setDeliveryState(s);
         setEta((o as any).eta_minutes ?? null);
+      }
+
+      // buyer phone (only meaningful after locked; safe to show "not shared" otherwise)
+      const requestId = (o as any)?.request_id as string | undefined;
+      if (requestId) {
+        const { data: reqRow, error: reqErr } = await supabase
+          .from("requests")
+          .select("user_id")
+          .eq("id", requestId)
+          .maybeSingle();
+        if (!reqErr && reqRow?.user_id) {
+          setBuyerUserId((reqRow as any).user_id);
+          const { data: prof, error: pErr } = await supabase
+            .from("profiles")
+            .select("phone")
+            .eq("id", (reqRow as any).user_id)
+            .maybeSingle();
+          if (!pErr) {
+            const phone = (prof as any)?.phone ? String((prof as any).phone).trim() : "";
+            setBuyerPhone(phone || null);
+          }
+        }
       }
     })().catch((e) => alert(e.message));
   }, [orderId]);
@@ -108,6 +138,35 @@ export default function SellerOrderPage() {
               </a>
             ) : null}
           </>
+        )}
+      </div>
+
+      {/* Buyer contact */}
+      <div className="border border-zinc-200 rounded-2xl p-3 bg-white">
+        <div className="text-sm font-medium text-zinc-900">Buyer contact</div>
+        <div className="mt-1 text-xs text-zinc-500">
+          Visible after buyer accepts (if they added phone in Settings).
+        </div>
+
+        {buyerPhone ? (
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs text-zinc-500">Phone</div>
+              <div className="text-sm text-zinc-900 font-medium truncate">{buyerPhone}</div>
+            </div>
+            {telUrl ? (
+              <a
+                href={telUrl}
+                className="shrink-0 rounded-full bg-black text-white px-4 py-2 text-sm"
+              >
+                Call
+              </a>
+            ) : null}
+          </div>
+        ) : (
+          <div className="mt-3 text-xs text-zinc-600">
+            Not shared yet.
+          </div>
         )}
       </div>
 

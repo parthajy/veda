@@ -21,3 +21,6 @@ body {
 input, textarea, button {
   font: inherit;
 }
+
+/* Prevent horizontal jiggle from shadows/blur layers on some webviews */
+html, body { overflow-x: hidden; }

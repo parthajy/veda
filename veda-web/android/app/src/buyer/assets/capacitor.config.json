@@ -1,8 +1,0 @@
-{
-  "appId": "com.useveda.buyer",
-  "appName": "Veda Buyer",
-  "webDir": "public",
-  "server": {
-    "androidScheme": "https"
-  }
-}

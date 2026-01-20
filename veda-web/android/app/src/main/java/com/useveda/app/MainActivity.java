@@ -1,4 +1,4 @@
-package com.useveda.veda;
+package com.useveda.app;
 
 import com.getcapacitor.BridgeActivity;
 

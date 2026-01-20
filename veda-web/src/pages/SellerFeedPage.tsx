@@ -27,8 +27,8 @@ type SellerLoc = {
   id: string;
   seller_id: string;
   city: string;
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   radius_km: number;
   active: boolean;
 };
@@ -46,6 +46,7 @@ export default function SellerFeedPage() {
 
   const feedEmptyText = useMemo(() => {
     if (!loc) return "";
+    if (loc.lat == null || loc.lng == null) return "Set your location (lat/lng) in Settings.";
     if (busyFeed) return "Refreshing…";
     if (!items.length) return "No nearby requests right now.";
     return "";
@@ -190,6 +191,10 @@ export default function SellerFeedPage() {
   async function refreshFeed(overrideLoc?: SellerLoc | null) {
     const L = overrideLoc ?? loc;
     if (!L) return;
+        if (L.lat == null || L.lng == null) {
+      setItems([]);
+      return;
+    }
 
     setBusyFeed(true);
     try {
@@ -272,7 +277,7 @@ export default function SellerFeedPage() {
         <div className="mt-1 text-xs text-zinc-500">
           Seller requires location + radius. Go to Settings and save your active location.
         </div>
-        <Link to="/settings" className="mt-4 inline-flex rounded-full bg-black text-white px-4 py-2 text-sm">
+        <Link to="/seller/settings" className="mt-4 inline-flex rounded-full bg-black text-white px-4 py-2 text-sm">
           Open Settings
         </Link>
       </div>
@@ -314,13 +319,13 @@ export default function SellerFeedPage() {
             step={0.5}
           />
           <input
-            value={loc.lat}
+            value={loc.lat ?? ""}
             onChange={(e) => setLoc({ ...loc, lat: Number(e.target.value) } as any)}
             className="border border-zinc-200 rounded-xl px-3 py-2 text-xs outline-none"
             placeholder="Lat"
           />
           <input
-            value={loc.lng}
+            value={loc.lng ?? ""}
             onChange={(e) => setLoc({ ...loc, lng: Number(e.target.value) } as any)}
             className="border border-zinc-200 rounded-xl px-3 py-2 text-xs outline-none"
             placeholder="Lng"

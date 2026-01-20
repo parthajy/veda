@@ -306,6 +306,8 @@ export default function ThreadDetailPage() {
 }
 
   async function acceptOffer(offerId: string) {
+    const u = (await supabase.auth.getUser()).data.user;
+if (!u) throw new Error("Not signed in");
   setBusy(true);
   try {
     const chosen = offers.find((o) => o.id === offerId);
@@ -318,6 +320,30 @@ export default function ThreadDetailPage() {
       return;
     }
     console.log("accept_offer_and_lock ok", data);
+
+    // After accepting, share buyer phone number (if present) so the seller can call.
+// We send it as a normal chat message for now (simple + works across web + app).
+if (chosen?.seller_id) {
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("phone")
+    .eq("id", u.id)
+    .maybeSingle();
+
+  const phone = (prof as any)?.phone ? String((prof as any).phone).trim() : "";
+  if (phone) {
+    await supabase.from("messages").insert({
+      request_id: requestId,
+      seller_id: chosen.seller_id,
+      from_role: "user",
+      from_id: u.id,
+      body: `My phone number: ${phone}`,
+    });
+  } else {
+    // Don't block acceptance; just inform.
+    alert("Order accepted. Add your phone in Settings if you want the seller to call you.");
+  }
+}
 
     await refreshAll();
     setTab("details");
@@ -351,57 +377,61 @@ export default function ThreadDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="mb-4 rounded-full border border-zinc-200 bg-zinc-50 p-1 flex">
-  <button
-    onClick={() => setTab("details")}
-    className={[
-      "flex-1 rounded-full px-3 py-2 text-xs font-medium",
-      tab === "details" ? "bg-white shadow-sm border border-zinc-200" : "text-zinc-600",
-    ].join(" ")}
-  >
-    Order
-  </button>
-  {order?.id ? (
-  <div className="rounded-3xl border border-zinc-200 bg-white p-4">
-    <div className="text-sm font-medium text-zinc-900">Delivery</div>
+            <div className="mb-4 rounded-full border border-zinc-200 bg-zinc-50 p-1 flex">
+        <button
+          onClick={() => setTab("details")}
+          className={[
+            "flex-1 rounded-full px-3 py-2 text-xs font-medium",
+            tab === "details" ? "bg-white shadow-sm border border-zinc-200" : "text-zinc-600",
+          ].join(" ")}
+        >
+          Order
+        </button>
 
-    <div className="mt-2 flex items-center justify-between">
-      <div className="text-xs text-zinc-600">
-        Status:{" "}
-        <span className="text-zinc-900 font-medium">
-          {(order as any).delivery_state === "on_the_way"
-            ? "On the way"
-            : (order as any).delivery_state === "arrived"
-            ? "Arrived"
-            : "Preparing"}
-        </span>
+        <button
+          onClick={() => setTab("chat")}
+          className={[
+            "flex-1 rounded-full px-3 py-2 text-xs font-medium",
+            tab === "chat" ? "bg-white shadow-sm border border-zinc-200" : "text-zinc-600",
+          ].join(" ")}
+        >
+          Chat
+        </button>
       </div>
 
-      <div className="text-xs text-zinc-600">
-        ETA:{" "}
-        <span className="text-zinc-900 font-medium">
-          {(order as any).eta_minutes ? `${(order as any).eta_minutes} min` : "—"}
-        </span>
-      </div>
-    </div>
+      {tab === "details" && order?.id ? (
+        <div className="rounded-3xl border border-zinc-200 bg-white p-4 mb-3">
+          <div className="text-sm font-medium text-zinc-900">Delivery</div>
+          <div className="mt-2 flex items-center justify-between">
+            <div className="text-xs text-zinc-600">
+              Status:{" "}
+              <span className="text-zinc-900 font-medium">
+                {(order as any).delivery_state === "on_the_way"
+                  ? "On the way"
+                  : (order as any).delivery_state === "arrived"
+                  ? "Arrived"
+                  : "Preparing"}
+              </span>
+            </div>
+            <div className="text-xs text-zinc-600">
+              ETA:{" "}
+              <span className="text-zinc-900 font-medium">
+                {(order as any).eta_minutes ? `${(order as any).eta_minutes} min` : "—"}
+              </span>
+            </div>
+          </div>
+          <div className="mt-2 text-[11px] text-zinc-500">
+            Seller updates this when they start delivery.
+          </div>
+        </div>
+      ) : null}
 
-    <div className="mt-2 text-[11px] text-zinc-500">
-      Seller updates this when they start delivery.
-    </div>
-  </div>
-) : null}
+      {tab === "details" && requestId ? (
+        <div className="mb-3">
+          <ThreadPhotosPanel requestId={requestId} uploaderRole="buyer" />
+        </div>
+      ) : null}
 
-{requestId ? <ThreadPhotosPanel requestId={requestId} uploaderRole="buyer" /> : null}
-  <button
-    onClick={() => setTab("chat")}
-    className={[
-      "flex-1 rounded-full px-3 py-2 text-xs font-medium",
-      tab === "chat" ? "bg-white shadow-sm border border-zinc-200" : "text-zinc-600",
-    ].join(" ")}
-  >
-    Chat
-  </button>
-</div>
 
       {!req ? (
         <div className="text-sm text-zinc-600">Loading…</div>
