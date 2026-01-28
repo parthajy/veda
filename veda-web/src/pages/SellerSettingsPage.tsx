@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { signOut } from "../lib/auth";
 import { supabase } from "../lib/supabase";
 import { MapPin, Save, LogOut, Store, Phone, User2 } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
 
 type SellerLoc = {
   id: string;
@@ -17,7 +19,7 @@ type SellerProfile = {
   id: string;
   display_name: string | null;
   store_name: string | null;
-  phone: string | null;
+  phone: string | null; // from OTP auth, show read-only
 };
 
 function clampRadius(v: number) {
@@ -36,31 +38,31 @@ export default function SellerSettingsPage() {
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-  (async () => {
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) return;
+    (async () => {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) return;
 
-    const { data: cats } = await supabase.from("categories").select("id,name").order("sort_order", { ascending: true });
-    setAllCats(cats ?? []);
+      const { data: cats } = await supabase
+        .from("categories")
+        .select("id,name")
+        .order("sort_order", { ascending: true });
+      setAllCats(cats ?? []);
 
-    const { data: my } = await supabase
-      .from("seller_categories")
-      .select("category_id")
-      .eq("seller_id", user.id);
+      const { data: my } = await supabase.from("seller_categories").select("category_id").eq("seller_id", user.id);
 
-    setSelectedCats(new Set(my?.map((d: any) => d.category_id) ?? []));
-  })();
-}, []);
+      setSelectedCats(new Set(my?.map((d: any) => d.category_id) ?? []));
+    })();
+  }, []);
 
   const canSave = useMemo(() => {
     if (!profile || !loc) return false;
-    const hasBasics = (profile.display_name ?? "").trim().length > 0 && (profile.store_name ?? "").trim().length > 0;
-    const hasPhone = (profile.phone ?? "").trim().length >= 8;
+    const hasBasics =
+      (profile.display_name ?? "").trim().length > 0 && (profile.store_name ?? "").trim().length > 0;
 
     const hasServiceArea =
       (loc.city ?? "").trim().length > 0 && loc.lat != null && loc.lng != null && (loc.radius_km ?? 0) > 0;
 
-    return hasBasics && hasPhone && hasServiceArea && !busy;
+    return hasBasics && hasServiceArea && !busy;
   }, [profile, loc, busy]);
 
   useEffect(() => {
@@ -81,7 +83,15 @@ export default function SellerSettingsPage() {
       .eq("id", user.id)
       .maybeSingle();
     if (pErr) throw pErr;
-    setProfile((p as any) ?? { id: user.id, display_name: null, store_name: null, phone: null });
+
+    setProfile(
+      (p as any) ?? {
+        id: user.id,
+        display_name: null,
+        store_name: null,
+        phone: user.phone ?? null,
+      }
+    );
 
     const { data: existing, error: locErr } = await supabase
       .from("seller_locations")
@@ -117,20 +127,58 @@ export default function SellerSettingsPage() {
   }
 
   async function useDeviceLocation() {
-    if (!loc) return;
-    setBusy(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLoc({ ...loc, lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setBusy(false);
-      },
-      () => {
-        alert("Location permission denied.");
-        setBusy(false);
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+  if (!loc) return;
+  setBusy(true);
+
+  try {
+    // ✅ Native app: prompt permission + fetch GPS via Capacitor
+    if (Capacitor.isNativePlatform()) {
+      const perm = await Geolocation.requestPermissions();
+
+      const status =
+        (perm as any).location ??
+        (perm as any).coarseLocation ??
+        (perm as any).fineLocation;
+
+      if (status && String(status).toLowerCase() !== "granted") {
+        throw new Error("Location permission denied. Please allow it when prompted.");
+      }
+
+      const pos = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000,
+      });
+
+      setLoc({
+        ...loc,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      });
+
+      return;
+    }
+
+    // ✅ Web: fallback to browser geolocation prompt
+    await new Promise<void>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLoc({
+            ...loc,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
+          resolve();
+        },
+        (err) => reject(err),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+  } catch (e: any) {
+    alert(e?.message ?? "Could not get your location.");
+  } finally {
+    setBusy(false);
   }
+}
 
   async function saveAll() {
     if (!profile || !loc) return;
@@ -145,7 +193,7 @@ export default function SellerSettingsPage() {
         .update({
           display_name: (profile.display_name ?? "").trim(),
           store_name: (profile.store_name ?? "").trim(),
-          phone: (profile.phone ?? "").trim(),
+          // phone comes from OTP auth; do not allow manual editing here
         })
         .eq("id", user.id);
 
@@ -250,15 +298,16 @@ export default function SellerSettingsPage() {
 
           <label className="block">
             <div className="text-[11px] text-zinc-500 mb-1 inline-flex items-center gap-2">
-              <Phone size={14} /> Phone number
+              <Phone size={14} /> Phone (verified)
             </div>
             <input
               value={profile.phone ?? ""}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-              className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm outline-none"
-              placeholder="e.g. +91 98xxxxxx"
+              readOnly
+              className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm outline-none bg-zinc-50 text-zinc-700"
+              placeholder="Verified phone will appear here"
               inputMode="tel"
             />
+            <div className="mt-1 text-[11px] text-zinc-500">Phone is from OTP login. No manual entry needed.</div>
           </label>
         </div>
       </div>
@@ -281,15 +330,14 @@ export default function SellerSettingsPage() {
             placeholder="City (required)"
           />
 
-          {/* Number input */}
           <input
             value={radius}
             onChange={(e) =>
-  setLoc({
-    ...loc,
-    radius_km: clampRadius(Number(e.target.value)),
-  })
-}
+              setLoc({
+                ...loc,
+                radius_km: clampRadius(Number(e.target.value)),
+              })
+            }
             className="border border-zinc-200 rounded-xl px-3 py-2 text-xs outline-none"
             placeholder="Radius km"
             type="number"
@@ -312,7 +360,6 @@ export default function SellerSettingsPage() {
           />
         </div>
 
-        {/* Slider */}
         <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-3">
           <div className="flex items-center justify-between">
             <div className="text-xs text-zinc-600">Delivery radius</div>
@@ -325,11 +372,11 @@ export default function SellerSettingsPage() {
             step={0.5}
             value={radius}
             onChange={(e) =>
-  setLoc({
-    ...loc,
-    radius_km: clampRadius(Number(e.target.value)),
-  })
-}
+              setLoc({
+                ...loc,
+                radius_km: clampRadius(Number(e.target.value)),
+              })
+            }
             className="mt-2 w-full"
           />
           <div className="mt-1 flex justify-between text-[10px] text-zinc-500">
@@ -383,7 +430,7 @@ export default function SellerSettingsPage() {
 
       {!canSave ? (
         <div className="mt-2 text-[11px] text-amber-700">
-          Required: your name, store name, phone, and service area (city + GPS + radius).
+          Required: your name, store name, and service area (city + GPS + radius).
         </div>
       ) : null}
     </div>

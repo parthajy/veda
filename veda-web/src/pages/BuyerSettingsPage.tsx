@@ -18,7 +18,7 @@ type BuyerLoc = {
 type BuyerProfile = {
   id: string;
   display_name: string | null;
-  phone: string | null;
+  phone: string | null; // from auth, show read-only
 };
 
 function safeParseLoc(raw: string | null): BuyerLoc | null {
@@ -52,8 +52,7 @@ export default function BuyerSettingsPage() {
 
   const canSave = useMemo(() => {
     const nameOk = (profile?.display_name ?? "").trim().length > 0;
-    const phoneOk = (profile?.phone ?? "").trim().length >= 8;
-    return nameOk && phoneOk && hasLocality && hasGps && !busy;
+    return nameOk && hasLocality && hasGps && !busy;
   }, [profile, hasLocality, hasGps, busy]);
 
   useEffect(() => {
@@ -83,7 +82,7 @@ export default function BuyerSettingsPage() {
           (data as any) ?? {
             id: user.id,
             display_name: "",
-            phone: "",
+            phone: user.phone ?? "",
           }
         );
       } catch (e: any) {
@@ -100,48 +99,45 @@ export default function BuyerSettingsPage() {
   }
 
   async function useDeviceLocation() {
-  setLocBusy(true);
-  try {
-    const { lat, lng } = await getGpsOrThrow();
-    const next = { ...loc, lat, lng };
-    setLoc(next);
-    persistLocation({ lat, lng });
-  } catch (e: any) {
-    alert(e?.message ?? "Location permission denied.");
-  } finally {
-    setLocBusy(false);
+    setLocBusy(true);
+    try {
+      const { lat, lng } = await getGpsOrThrow();
+      const next = { ...loc, lat, lng };
+      setLoc(next);
+      persistLocation({ lat, lng });
+    } catch (e: any) {
+      alert(e?.message ?? "Location permission denied.");
+    } finally {
+      setLocBusy(false);
+    }
   }
-}
 
   async function getGpsOrThrow(): Promise<{ lat: number; lng: number }> {
-  if (Capacitor.isNativePlatform()) {
-    const perm = await Geolocation.requestPermissions();
+    if (Capacitor.isNativePlatform()) {
+      const perm = await Geolocation.requestPermissions();
 
-    const locPerm =
-      (perm as any).location ??
-      (perm as any).coarseLocation ??
-      (perm as any).fineLocation;
+      const locPerm = (perm as any).location ?? (perm as any).coarseLocation ?? (perm as any).fineLocation;
 
-    if (locPerm && String(locPerm).toLowerCase() !== "granted") {
-      throw new Error("Location permission denied. Enable Location permission for the app.");
+      if (locPerm && String(locPerm).toLowerCase() !== "granted") {
+        throw new Error("Location permission denied. Enable Location permission for the app.");
+      }
+
+      const pos = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 8000,
+      });
+
+      return { lat: pos.coords.latitude, lng: pos.coords.longitude };
     }
 
-    const pos = await Geolocation.getCurrentPosition({
-      enableHighAccuracy: true,
-      timeout: 8000,
+    return await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => reject(new Error("Location permission denied.")),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
     });
-
-    return { lat: pos.coords.latitude, lng: pos.coords.longitude };
   }
-
-  return await new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => reject(new Error("Location permission denied.")),
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
-  });
-}
 
   async function saveAll() {
     if (!profile) return;
@@ -159,14 +155,14 @@ export default function BuyerSettingsPage() {
       };
       localStorage.setItem(LS_LOC_KEY, JSON.stringify(cleanLoc));
 
-      // ✅ IMPORTANT: use UPSERT so first-time users actually create the row
+      // ✅ IMPORTANT: upsert so first-time users create the row
+      // Phone is verified via OTP auth and should NOT be manually edited here.
       const { error } = await supabase
         .from("profiles")
         .upsert(
           {
             id: user.id,
             display_name: (profile.display_name ?? "").trim(),
-            phone: (profile.phone ?? "").trim(),
           },
           { onConflict: "id" }
         );
@@ -210,9 +206,7 @@ export default function BuyerSettingsPage() {
       {/* Buyer profile */}
       <div className="border border-zinc-200 rounded-2xl p-3">
         <div className="text-sm font-medium text-zinc-900">Your details</div>
-        <div className="mt-0.5 text-[11px] text-zinc-500">
-          Shared with seller only after you accept an offer.
-        </div>
+        <div className="mt-0.5 text-[11px] text-zinc-500">Shared with seller only after you accept an offer.</div>
 
         <div className="mt-3 space-y-2">
           <label className="block">
@@ -226,14 +220,17 @@ export default function BuyerSettingsPage() {
           </label>
 
           <label className="block">
-            <div className="text-[11px] text-zinc-500 mb-1">Phone</div>
+            <div className="text-[11px] text-zinc-500 mb-1">Phone (verified)</div>
             <input
               value={profile.phone ?? ""}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-              className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm outline-none"
-              placeholder="e.g. +91 98xxxxxx"
+              readOnly
+              className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm outline-none bg-zinc-50 text-zinc-700"
+              placeholder="Verified phone will appear here"
               inputMode="tel"
             />
+            <div className="mt-1 text-[11px] text-zinc-500">
+              Phone is from OTP login. No manual entry needed.
+            </div>
           </label>
         </div>
       </div>
@@ -294,9 +291,7 @@ export default function BuyerSettingsPage() {
         </div>
 
         {!canSave ? (
-          <div className="mt-2 text-[11px] text-amber-700">
-            Required: name, phone, city + locality, GPS.
-          </div>
+          <div className="mt-2 text-[11px] text-amber-700">Required: name, city + locality, GPS.</div>
         ) : null}
 
         <div className="mt-2 text-[11px] text-zinc-500">
@@ -306,9 +301,7 @@ export default function BuyerSettingsPage() {
 
       <div className="mt-4 border border-zinc-200 rounded-2xl p-3">
         <div className="text-sm font-medium text-zinc-900">Order history</div>
-        <div className="mt-2 text-xs text-zinc-500">
-          For MVP, history is your Threads list (fulfilled/cancelled show there).
-        </div>
+        <div className="mt-2 text-xs text-zinc-500">For MVP, history is your Threads list (fulfilled/cancelled show there).</div>
       </div>
     </div>
   );

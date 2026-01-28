@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "790293414820",
+    "project_id": "usevedaapp",
+    "storage_bucket": "usevedaapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:790293414820:android:555a3f2745b08c0cb93731",
+        "android_client_info": {
+          "package_name": "com.useveda.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD8mPIre3Htt_O5JKaRunE0X7fU15yTSRQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -7,51 +7,90 @@ function isSellerPath() {
   return p === "/seller" || p.startsWith("/seller/");
 }
 
-/**
- * ✅ Now: only ensures profile IF a real session exists.
- * ❌ No anonymous sign-in anymore.
- */
+function normalizePhoneIN(raw: string) {
+  const s = (raw || "").trim();
+  if (!s) return "";
+
+  // keep digits only
+  const digits = s.replace(/\D/g, "");
+  if (!digits) return "";
+
+  // 10-digit local -> +91
+  if (digits.length === 10) return `+91${digits}`;
+
+  // already includes country code like 91xxxxxxxxxx
+  if (digits.length >= 11 && digits.startsWith("91")) return `+${digits}`;
+
+  // fallback: prefix +
+  return `+${digits}`;
+}
+
 export async function ensureSessionAndProfile() {
   const { data } = await supabase.auth.getSession();
   const user = data.session?.user;
+  if (!user) return;
 
-  if (!user) {
-    // No session — caller decides what UI to show (AuthWall).
-    return;
-  }
+  const userPhone = (user.phone ?? "").trim() || null;
 
-  const { data: existing, error: selErr } = await supabase
+  const { data: existing, error } = await supabase
     .from("profiles")
-    .select("id, role, display_name")
+    .select("id, role, display_name, phone")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (selErr) throw selErr;
+  if (error) throw error;
 
   if (!existing) {
-    const { error: insErr } = await supabase.from("profiles").insert({
+    const { error: insertErr } = await supabase.from("profiles").insert({
       id: user.id,
       role: isSellerPath() ? "seller" : "user",
       display_name: null,
+      phone: userPhone,
     });
-    if (insErr) throw insErr;
+    if (insertErr) throw insertErr;
   } else {
-    // one-way upgrade to seller if user enters seller area
+    // Promote to seller role if they enter seller surface
     if (isSellerPath() && existing.role !== "seller") {
-      await supabase.from("profiles").update({ role: "seller" }).eq("id", user.id);
+      const { error: updErr } = await supabase
+        .from("profiles")
+        .update({ role: "seller" })
+        .eq("id", user.id);
+      if (updErr) throw updErr;
+    }
+
+    // Keep verified phone synced (no manual typing required)
+    if (userPhone && existing.phone !== userPhone) {
+      await supabase.from("profiles").update({ phone: userPhone }).eq("id", user.id);
     }
   }
 }
 
-export async function signInWithGoogle() {
-  // Preserve current path so seller login returns to /seller (not just /)
-  const redirectTo = window.location.origin + window.location.pathname;
+export async function requestPhoneOtp(rawPhone: string) {
+  const phone = normalizePhoneIN(rawPhone);
+  if (!phone) throw new Error("Enter a valid phone number");
 
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo },
+  const { error } = await supabase.auth.signInWithOtp({
+    phone,
+    options: { channel: "sms" },
   });
+
   if (error) throw error;
+  return phone;
+}
+
+export async function verifyPhoneOtp(phone: string, code: string) {
+  const token = (code || "").trim();
+  if (!token) throw new Error("Enter OTP");
+
+  const { error } = await supabase.auth.verifyOtp({
+    phone,
+    token,
+    type: "sms",
+  });
+
+  if (error) throw error;
+
+  await ensureSessionAndProfile();
 }
 
 export async function signOut() {

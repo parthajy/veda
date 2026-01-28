@@ -16,6 +16,8 @@
     "android:assets:buyer": "npm run build:buyer && rm -rf android/app/src/buyer/assets/public && mkdir -p android/app/src/buyer/assets/public && cp -R dist/* android/app/src/buyer/assets/public/"
   },
   "dependencies": {
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/browser": "^8.0.0",
     "@capacitor/geolocation": "^8.0.0",
     "@capacitor/push-notifications": "^8.0.0",
     "@supabase/supabase-js": "^2.90.1",
